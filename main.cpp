@@ -15,7 +15,7 @@ string extractUserData (ifstream *, string, unsigned short);
 void createNewUser ();
 void checkMoney (string);
 void cashOut (string);
-void UpdateMoney(unsigned int);
+void eraseTempFiles ();
 
 int main()
 {
@@ -26,35 +26,33 @@ int main()
 
 void system () {
 
+    eraseTempFiles();
+
     string id;
 
-    while (1) {
+    cout<<endl;
+    cout<<"|||||||||||||||||||||||||||||||||||||||||||"<<endl;
+    cout<<"|||                                     |||"<<endl;
+    cout<<"|||            BIENVENIDO AL            |||"<<endl;
+    cout<<"|||          CAJERO AUTOMATICO          |||"<<endl;
+    cout<<"|||                                     |||"<<endl;
+    cout<<"|||           Salir presione *          |||"<<endl;
+    cout<<"|||                                     |||"<<endl;
+    cout<<"|||||||||||||||||||||||||||||||||||||||||||"<<endl;
+    cout<<endl;
+    cout<<"Identificacion: ";
 
-        cout<<endl;
-        cout<<"|||||||||||||||||||||||||||||||||||||||||||"<<endl;
-        cout<<"|||                                     |||"<<endl;
-        cout<<"|||            BIENVENIDO AL            |||"<<endl;
-        cout<<"|||          CAJERO AUTOMATICO          |||"<<endl;
-        cout<<"|||                                     |||"<<endl;
-        cout<<"|||           Salir presione *          |||"<<endl;
-        cout<<"|||                                     |||"<<endl;
-        cout<<"|||||||||||||||||||||||||||||||||||||||||||"<<endl;
-        cout<<endl;
-        cout<<"Identificacion: ";
+    fflush(stdin);
+    getline(cin, id);
 
-        fflush(stdin);
-        getline(cin, id);
+    if (id.compare("*"))  {
 
-        if (id.compare("*"))  {
+        loadDataBase();
 
-            loadDataBase();
-
-            if (id == "admin")
-                administrator();
-            else
-                client(id);
-        } else
-            break;
+        if (id == "admin")
+            administrator();
+        else
+            client(id);
     }
 }
 
@@ -81,17 +79,17 @@ void administrator () {
             cout << ">>>  Opcion no valida  <<<" << endl;
 
     } else {
-        cout << ">>> clave invalida <<<" << endl;
+        cout << ">>> Contrasena invalida <<<" << endl;
         system();
     }
 
 }
 
-bool validateUser (string user, string password) {
+bool validateUser (string id, string password) {
 
     bool flag = false;
 
-    if (user == "admin") {
+    if (id == "admin") {
 
         string passEntered = encrypData(password), encrypPass;
 
@@ -101,6 +99,7 @@ bool validateUser (string user, string password) {
             if (!fin.is_open())
                 throw '1';
 
+            fin.seekg(0);
             while (fin.good())
                 encrypPass += fin.get();
 
@@ -116,6 +115,7 @@ bool validateUser (string user, string password) {
         }
 
         flag = passEntered == encrypPass;
+
     } else {
 
         try {
@@ -124,7 +124,13 @@ bool validateUser (string user, string password) {
             if (!fin.is_open())
                 throw '1';
 
-            flag = password == extractUserData(&fin, user, 1);
+            if (id != extractUserData(&fin, id, 0)) {
+
+                cout << " >>>  El usuario no existe  <<< " << endl << endl;
+                system();
+            }
+
+            flag = password == extractUserData(&fin, id, 1);
 
             fin.close();
 
@@ -181,8 +187,8 @@ void client (string user) {
         char reply;
 
         cout << endl << "1. Consultar saldo (Costo: 1000)";
-        cout << endl << "2. Retirar saldo (Costo: 1000)" << endl;
-        cout << endl << "*  Para salir" << endl;
+        cout << endl << "2. Retirar saldo (Costo: 1000)";
+        cout << endl << "*  Para salir oprima otra tecla" << endl;
         cout << endl << "Movimiento 1/2: ";
         cin >> reply;
 
@@ -192,12 +198,8 @@ void client (string user) {
             checkMoney(user);
         else if (reply == '2')
             cashOut(user);
-        else if (reply == '*')
+        else
             system();
-        else {
-            cout << ">>>  Opcion no valida  <<<" << endl;
-            system();
-        }
 
     } else {
         cout << ">>> clave invalida <<<" << endl;
@@ -244,6 +246,9 @@ void loadDataBase () {
             fout << endl;
         }
 
+        fin.close();
+        fout.close();
+
     }  catch (char c) {
         if (c == '1')
             cout << "loadDataBase: Error archivo de lectura" << endl;
@@ -268,46 +273,51 @@ void binaryToText (string byte, ofstream *fout) {
 
 string extractUserData (ifstream *fin, string user, unsigned short option) {
 
-    string data[3], aux;
+    string aux, temp;
     unsigned short i = 0;
     bool flag = false;
 
-    data[0] = "null";
-    data[1] = "null";
-    data[2] = "null";
+    aux = "null";
 
+    fin->seekg(0);
     for (string line; getline(*fin, line); ) {
 
         while (line[i] != ';') {
 
-            aux += line[i++];
+            temp += line[i++];
         }
 
-        if (aux == user) {
-            data[0] = user;
-            data[1].clear();
-            data[2].clear();
-            aux = line.substr(++i);
-            flag = !flag;
-            i = 0;
-            break;
+        if (temp == user) {
+
+            if (option == 0)
+                return user;
+            else if (option == 1 || option == 2) {
+                aux.clear();
+                temp = line.substr(++i);
+                flag = !flag;
+                i = 0;
+                break;
+            }
         }
 
-        aux.clear();
+        temp.clear();
         i = 0;
     }
 
     if (flag) {
 
-        while (aux[i] != ';') {
+        while (temp[i] != ';') {
 
-            data[1] += aux[i++];
+            aux += temp[i++];
         }
 
-        data[2] = aux.substr(++i);
+        if (option == 1)
+            return aux;
+
+        return temp.substr(++i);
     }
 
-    return data[option];
+    return aux;
 }
 
 void createNewUser () {
@@ -335,7 +345,17 @@ void createNewUser () {
         if (id == extractUserData(&fin, id, 0)) {
 
             cout << " >>>  El usuario ya existe  <<< " << endl << endl;
-            createNewUser();
+
+            char reply;
+            cout << endl << "Salir y/n: ";
+            cin >> reply;
+
+            if (reply == 'y')
+                system();
+            else {
+                cout << endl;
+                createNewUser();
+            }
         }
 
         cout << "Ingrese clave: ";
@@ -350,7 +370,7 @@ void createNewUser () {
 
         if (reply == 'y') {
 
-            fout << encrypData(id + ';' + pass + ';' + balance);
+            fout << encrypData(id + ';' + pass + ';' + balance) << endl;
             cout << ">>> Usuario creado con exito <<<" << endl;
         } else if (reply == 'n')
 
@@ -358,7 +378,7 @@ void createNewUser () {
         else {
 
             cout << "Opcion no valida" << endl;
-            createNewUser();
+            system();
         }
 
         cout << endl << endl << "Desea crear otro usuario y/n: ";
@@ -366,10 +386,17 @@ void createNewUser () {
 
         if (reply == 'y') {
 
-            fout.close();
             createNewUser();
+        } else if (reply == 'n')
+
+            system();
+        else {
+
+            cout << "Opcion no valida" << endl;
+            system();
         }
 
+        fin.close();
         fout.close();
 
     }  catch (char c) {
@@ -393,26 +420,45 @@ void checkMoney (string id) {
         if (!fout.is_open())
             throw '2';
 
+        bool flag = true;
         string aux, buffer;
+        string pass = extractUserData(&fin, id, 1);
+        unsigned int balance = atoi(extractUserData(&fin, id, 2).c_str());
 
 
+        fin.seekg(0);
         for (string line; getline(fin, line); ) {
 
-            if (id == extractUserData(&fin, id, 0)) {
+            if (flag) {
 
-                unsigned int balance = atoi(extractUserData(&fin, id, 2).c_str());
+                if ((id == line.substr(0, id.length())) && (line.length() > id.length()) && (line[id.length()] == ';')) {
 
-                if (balance >= 1000) {
+                    if (balance >= 1000) {
 
-                    cout << "Saldo actual: " << balance;
-                    balance -= 1000;
-                    cout << "Saldo posterior a la operacion: " << balance << endl;
+                        cout << endl << "Saldo actual: " << balance;
+                        balance -= 1000;
+                        cout << endl << "Saldo posterior a la operacion: " << balance << endl;
+
+                        fout << encrypData(id + ';' + pass + ';' + to_string(balance)) << endl;
+                        flag = !flag;
+
+                    } else {
+
+                        cout << " >>  Saldo insuficiente, no se puede realizar la operacion  <<< " << endl;
+                        fout << encrypData(line) << endl;
+                        flag = !flag;
+                    }
+
                 } else
-                    cout << " >>  Saldo insuficiente, no se puede realizar la operacion  <<< " << endl;
-
+                    fout << encrypData(line) << endl;
             } else
                 fout << encrypData(line) << endl;
         }
+
+        fin.close();
+        fout.close();
+
+        system();
 
     }  catch (char c) {
         if (c == '1')
@@ -421,5 +467,89 @@ void checkMoney (string id) {
             cout << "checkMoney: Error archivo de escritura" << endl;
         else
             cout << "checkMoney: Error inesperado" << endl;
+    }
+}
+
+void cashOut (string id) {
+
+    try {
+        ifstream fin;
+        fin.open("temp.txt");
+        if (!fin.is_open())
+            throw '1';
+
+        bool flag = true;
+        string aux, buffer;
+        string pass = extractUserData(&fin, id, 1);
+        unsigned int balance = atoi(extractUserData(&fin, id, 2).c_str()), cash;
+
+        cout << "Ingrese el valor a retirar: ";
+        cin >> cash;
+
+        ofstream fout;
+        fout.open("database.txt");
+        if (!fout.is_open())
+            throw '2';
+
+        fin.seekg(0);
+
+        for (string line; getline(fin, line); ) {
+
+            if (flag) {
+
+                if ((id == line.substr(0, id.length())) && (line.length() > id.length()) && (line[id.length()] == ';')) {
+
+                    if (balance >= (1000 + cash)) {
+
+                        cout << endl << "Saldo actual: " << balance;
+                        balance -= (1000 + cash);
+                        cout << endl << "Saldo posterior a la operacion: " << balance << endl;
+
+                        fout << encrypData(id + ';' + pass + ';' + to_string(balance)) << endl;
+                        flag = !flag;
+
+                    } else {
+
+                        cout << " >>  Saldo insuficiente, no se puede realizar la operacion  <<< " << endl;
+                        fout << encrypData(line) << endl;
+                        flag = !flag;
+                    }
+
+                } else
+                    fout << encrypData(line) << endl;
+            } else
+                fout << encrypData(line) << endl;
+        }
+
+        fin.close();
+        fout.close();
+
+        system();
+
+    }  catch (char c) {
+        if (c == '1')
+            cout << "cashOut: Error archivo de lectura" << endl;
+        else if (c == '2')
+            cout << "cashOut: Error archivo de escritura" << endl;
+        else
+            cout << "cashOut: Error inesperado" << endl;
+    }
+}
+
+void eraseTempFiles () {
+
+    try {
+        ofstream fout;
+        fout.open("temp.txt");
+        if (!fout.is_open())
+            throw '1';
+
+        fout.close();
+
+    }  catch (char c) {
+        if (c == '1')
+            cout << "eraseTempFiles: Error archivo de lectura" << endl;
+        else
+            cout << "eraseTempFiles: Error inesperado" << endl;
     }
 }
